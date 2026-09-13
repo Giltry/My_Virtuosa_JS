@@ -1,0 +1,14 @@
+# Secretos: NUNCA subir el token del bot
+.env
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+*.tsbuildinfo
+
+# Editores / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

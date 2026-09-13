@@ -1,0 +1,22 @@
+{
+  "name": "virtuosa-js",
+  "version": "1.0.0",
+  "description": "Bot de musica para Discord en JavaScript. Usa yt-dlp como motor de audio.",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "diagnostico": "node diagnostico.js"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "dependencies": {
+    "@discordjs/voice": "^0.19.2",
+    "discord.js": "^14.27.0",
+    "dotenv": "^17.4.2",
+    "libsodium-wrappers": "^0.8.4"
+  },
+  "license": "MIT",
+  "private": true
+}
