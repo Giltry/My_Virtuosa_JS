@@ -2,10 +2,20 @@
 // Arranque: node index.js   (o npm start)
 
 import 'dotenv/config';
+import fs from 'node:fs';
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 
 import { ColaDeGuild } from './src/cola.js';
+import { CODIGO_YA_CORRIENDO, PUERTO_BOT, reclamarInstancia } from './src/instancia.js';
 import { buscarPista, resolverYtDlp } from './src/ytdlp.js';
+
+// Antes que nada: si ya hay un bot corriendo en este equipo, no arrancar otro.
+if (!(await reclamarInstancia(PUERTO_BOT))) {
+  // writeSync y no console.error: process.exit podria cortar el mensaje a medias.
+  fs.writeSync(2, 'Ya hay un bot corriendo en este equipo. Si arranco solo en segundo plano, '
+    + 'detenlo con: npm run inicio:detener\n');
+  process.exit(CODIGO_YA_CORRIENDO);
+}
 
 const PREFIJOS = ['!', '+', '/', '-'];
 

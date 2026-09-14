@@ -6,7 +6,13 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "diagnostico": "node diagnostico.js"
+    "diagnostico": "node diagnostico.js",
+    "supervisor": "node supervisor.js",
+    "logs": "powershell -NoProfile -Command Get-Content logs/bot.log -Tail 40 -Wait",
+    "inicio:instalar": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/instalar-inicio.ps1",
+    "inicio:desinstalar": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/desinstalar-inicio.ps1",
+    "inicio:detener": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/desinstalar-inicio.ps1 -SoloDetener",
+    "inicio:arrancar": "powershell -NoProfile -Command Start-ScheduledTask -TaskName VirtuosaJS-Bot"
   },
   "engines": {
     "node": ">=22.12.0"

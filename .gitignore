@@ -1,6 +1,9 @@
 # Secretos: NUNCA subir el token del bot
 .env
 
+# Logs del supervisor
+logs/
+
 # Node
 node_modules/
 npm-debug.log*

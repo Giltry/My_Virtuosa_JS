@@ -27,8 +27,8 @@ Si la cola se vacía, el bot se desconecta solo a los 30 segundos. También se v
 ## Instalación
 
 ```bash
-git clone <url-del-repo>
-cd Virtuosa-JS
+git clone https://github.com/Giltry/My_Virtuosa_JS.git
+cd My_Virtuosa_JS
 npm install
 ```
 
@@ -44,7 +44,7 @@ En el portal de Discord, activa el intent **MESSAGE CONTENT** (Bot → Privilege
 npm start
 ```
 
-> ⚠️ Si usas el mismo token que la versión de Python, **no ejecutes los dos a la vez**: ambos responderían a cada comando.
+> ⚠️ El bot se niega a arrancar si ya hay otra copia **de esta versión** corriendo en el mismo equipo. Pero no puede ver a la versión de Python: si comparten token, **no ejecutes las dos a la vez** o ambas responderán a cada comando.
 
 ## Comprobar que todo funciona
 
@@ -72,6 +72,43 @@ Recorre la cadena completa **sin conectarse a Discord** y te dice exactamente d�
 ```
 
 Puedes pasarle otra búsqueda: `npm run diagnostico -- "bad bunny"`.
+
+---
+
+## Siempre encendido (Windows)
+
+Para que el bot arranque solo y no tengas que ejecutar nada:
+
+```bash
+npm run inicio:instalar
+```
+
+Eso registra una tarea programada de Windows, `VirtuosaJS-Bot`, que arranca el bot **cada vez que inicias sesión**, sin abrir ninguna ventana. No necesita permisos de administrador. También lo arranca en ese momento, sin esperar al próximo reinicio.
+
+El bot no corre directamente: lo lanza un **supervisor** (`supervisor.js`) que se encarga de tres cosas:
+
+- **Lo reinicia si se cae.** Espera 5 s, luego 10, 20… hasta un máximo de 5 min entre intentos, para no insistir en bucle si algo está roto de verdad. Si el bot aguantó 10 minutos, el siguiente fallo vuelve a esperar poco.
+- **Actualiza yt-dlp** al arrancar y una vez al día. Es el arreglo del 90 % de las roturas, así que ahora ocurre solo. Para desactivarlo, pon `ACTUALIZAR_YTDLP=0` en el `.env`.
+- **Lo apunta todo en `logs/bot.log`**, porque en segundo plano no hay consola. Al pasar de 5 MB se mueve a `bot.log.1`.
+
+### Comandos del día a día
+
+| Comando | Qué hace |
+|---|---|
+| `npm run logs` | Muestra el log en vivo (Ctrl+C para salir; el bot sigue) |
+| `npm run inicio:detener` | Detiene el bot. Sigue instalado: vuelve al iniciar sesión |
+| `npm run inicio:arrancar` | Lo arranca de nuevo sin reiniciar la PC |
+| `npm run inicio:desinstalar` | Lo detiene y quita el arranque automático |
+
+### Límites a tener en cuenta
+
+- **Sólo funciona con la PC encendida y tu sesión iniciada.** Si la PC entra en suspensión, el bot se va con ella. Si quieres que esté disponible, desactiva la suspensión automática.
+- Si cambias la carpeta de sitio o de nombre, vuelve a ejecutar `npm run inicio:instalar`: la tarea guarda la ruta.
+- Si quieres usar `npm start` a mano para ver la consola, primero `npm run inicio:detener`. Si no, el bot se negará a arrancar porque ya hay uno corriendo.
+
+### Cuando pases a una Raspberry Pi
+
+La tarea programada es sólo de Windows. En Linux, lo equivalente es un servicio de **systemd** que ejecute `node supervisor.js`; el supervisor funciona igual. Un detalle: Raspberry Pi OS no deja instalar paquetes de pip en el sistema, así que instala yt-dlp dentro de un **entorno virtual** para que la actualización automática pueda funcionar.
 
 ---
 
@@ -126,6 +163,10 @@ Igual que la versión Python. El [README del repo original](https://github.com/G
 
 ### Antes de investigar nada
 
+Si el bot corre con el arranque automático, **yt-dlp ya se actualiza solo cada día**. Busca las líneas `[yt-dlp]` en `logs/bot.log` para confirmar que la última actualización funcionó.
+
+Si lo ejecutas a mano:
+
 ```bash
 pip install -U yt-dlp
 ```
@@ -140,6 +181,7 @@ El 90 % de las veces es eso. YouTube rota sus clientes internos y sus firmas cad
 | El diagnóstico pasa entero, pero en Discord no suena | Protocolo de voz | `npm update @discordjs/voice` |
 | `formato detectado: unknown` y luego falla | Formato raro + falta ffmpeg | Instala ffmpeg y ponlo en el PATH |
 | El bot ni arranca | Node demasiado viejo | Necesitas Node ≥ 22.12 |
+| El log repite `El bot se detuvo` una y otra vez | Lo que diga la línea `[bot:error]` justo antes | Casi siempre: token inválido o sin internet |
 
 ### 🔮 La próxima rotura, probablemente
 
@@ -160,10 +202,14 @@ Cuando el bot se rompa y actualizar yt-dlp **no** lo arregle, éste es el primer
 ## Estructura
 
 ```
-index.js          Cliente de Discord y comandos
-diagnostico.js    Comprueba la cadena completa sin tocar Discord
-src/ytdlp.js      TODO lo que habla con YouTube vive aquí
-src/cola.js       Estado de reproducción de un servidor
+index.js                      Cliente de Discord y comandos
+supervisor.js                 Mantiene el bot vivo, actualiza yt-dlp y escribe el log
+diagnostico.js                Comprueba la cadena completa sin tocar Discord
+src/ytdlp.js                  TODO lo que habla con YouTube vive aquí
+src/cola.js                   Estado de reproducción de un servidor
+src/instancia.js              Impide que corran dos copias a la vez
+scripts/instalar-inicio.ps1   Registra el arranque automático en Windows
+scripts/desinstalar-inicio.ps1  Lo detiene y/o lo quita
 ```
 
 La separación es a propósito: cuando YouTube rompa algo, el arreglo va en `src/ytdlp.js` y en ningún otro sitio.

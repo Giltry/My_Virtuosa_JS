@@ -24,7 +24,8 @@ function ejecutar(cmd, args, { timeoutMs = 120_000 } = {}) {
   return new Promise((resolve) => {
     let proceso;
     try {
-      proceso = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+      // windowsHide: al correr en segundo plano, que ningun subproceso abra ventana.
+      proceso = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
     } catch {
       resolve({ ok: false, salida: '', error: `no se pudo ejecutar ${cmd}` });
       return;
@@ -66,6 +67,37 @@ export async function resolverYtDlp() {
     'No encontre yt-dlp. Instalalo con "pip install -U yt-dlp" y asegurate de que ' +
     'el comando "yt-dlp" o "python -m yt_dlp" responda desde la terminal.',
   );
+}
+
+/**
+ * Actualiza yt-dlp a su ultima version y devuelve {antes, despues}. Lanza con el
+ * motivo si no puede. La usa el supervisor al arrancar y una vez al dia: actualizar
+ * yt-dlp es el arreglo del 90% de las roturas, asi que mejor que ocurra solo.
+ */
+export async function actualizarYtDlp() {
+  const { cmd, base, version: antes } = await resolverYtDlp();
+
+  let args;
+  if (base.includes('yt_dlp')) {
+    // Instalado con pip: se actualiza con el mismo Python que lo ejecuta. Sin --user
+    // a proposito: pip pasa solo a la instalacion de usuario cuando hace falta, y asi
+    // tambien funciona dentro de un entorno virtual, donde --user da error.
+    const prefijo = base.slice(0, base.indexOf('-m'));
+    args = [...prefijo, '-m', 'pip', 'install', '--upgrade', '--disable-pip-version-check', '--quiet', 'yt-dlp'];
+  } else {
+    // Binario suelto: trae su propio actualizador.
+    args = ['-U'];
+  }
+
+  const r = await ejecutar(cmd, args, { timeoutMs: 5 * 60_000 });
+  if (!r.ok) {
+    const motivo = `${r.error}\n${r.salida}`.split('\n').filter((l) => l.trim()).pop();
+    throw new Error(limpiar(motivo || 'fallo desconocido'));
+  }
+
+  resuelto = null; // que la proxima consulta lea la version nueva
+  const { version: despues } = await resolverYtDlp();
+  return { antes, despues };
 }
 
 /** Si es un enlace lo deja tal cual; si no, lo convierte en busqueda de YouTube. */
@@ -142,7 +174,7 @@ export async function abrirAudio(url) {
     '--fragment-retries', '10',
     '-o', '-', // volcar el audio a stdout
     url,
-  ], { stdio: ['ignore', 'pipe', 'pipe'] });
+  ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
 
   let errores = '';
   proceso.stderr.on('data', (d) => {
