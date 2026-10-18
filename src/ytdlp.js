@@ -107,6 +107,76 @@ export function construirConsulta(entrada) {
   return `ytsearch1:${texto}`;
 }
 
+/** Tope de canciones que se cargan de una playlist, para no llenar la cola con miles. */
+export const MAX_PISTAS_PLAYLIST = 100;
+
+/** Un enlace es de playlist si lleva "list=" (watch?v=...&list=..., playlist?list=...). */
+export function esPlaylist(entrada) {
+  const texto = entrada.trim();
+  if (!/^(https?:\/\/|www\.)/i.test(texto)) return false;
+  try {
+    const url = new URL(texto.startsWith('www.') ? `https://${texto}` : texto);
+    return url.searchParams.has('list');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Carga las canciones de una playlist SIN abrir cada video (--flat-playlist): asi
+ * tarda unos segundos aunque tenga 100 canciones. El audio de cada una se pide
+ * despues, justo antes de sonar, igual que con las pistas sueltas.
+ *
+ * Si el enlace es de un video dentro de la playlist (watch?v=X&list=Y), empieza
+ * desde ese video, que es lo que espera quien lo copio.
+ */
+export async function buscarPlaylist(entrada) {
+  const { cmd, base } = await resolverYtDlp();
+  const texto = entrada.trim();
+  const url = new URL(texto.startsWith('www.') ? `https://${texto}` : texto);
+
+  const r = await ejecutar(cmd, [
+    ...base,
+    '--flat-playlist',
+    '--yes-playlist',
+    '--dump-single-json',
+    '--no-warnings',
+    '--playlist-end', String(MAX_PISTAS_PLAYLIST * 2),
+    texto,
+  ]);
+
+  if (!r.ok) {
+    const motivo = (r.error || '').split('\n').filter(Boolean).pop() || 'yt-dlp fallo';
+    throw new Error(limpiar(motivo));
+  }
+
+  let info;
+  try {
+    info = JSON.parse(r.salida);
+  } catch {
+    throw new Error('yt-dlp devolvio una respuesta que no pude interpretar.');
+  }
+
+  let entradas = (info.entries ?? [])
+    .filter((e) => e && e.id)
+    // Los videos privados o borrados siguen en la lista, pero no se pueden reproducir.
+    .filter((e) => !/^\[(private|deleted)( video)?\]$/i.test(e.title ?? ''));
+
+  const inicio = entradas.findIndex((e) => e.id === url.searchParams.get('v'));
+  if (inicio > 0) entradas = entradas.slice(inicio);
+
+  const total = entradas.length;
+  const pistas = entradas.slice(0, MAX_PISTAS_PLAYLIST).map((e) => ({
+    titulo: e.title ?? 'Desconocido',
+    url: e.url?.startsWith('http') ? e.url : `https://www.youtube.com/watch?v=${e.id}`,
+    duracion: e.duration ?? null,
+  }));
+
+  if (pistas.length === 0) throw new Error('La playlist esta vacia o no tiene videos disponibles.');
+
+  return { titulo: info.title ?? 'Playlist', pistas, total };
+}
+
 /**
  * Busca una pista y devuelve sus datos. Guardamos el ENLACE DE LA PAGINA, nunca la
  * URL del stream: las URLs de audio de YouTube caducan en unas horas y una cancion

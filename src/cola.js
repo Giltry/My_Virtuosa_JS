@@ -43,11 +43,11 @@ export class ColaDeGuild {
     this.reproductor.on(AudioPlayerStatus.Idle, () => {
       this.#matarProceso();
       if (this.deteniendo) return;
-      this.siguiente().catch((e) => this.#avisar(`Error al pasar a la siguiente: ${e.message}`));
+      this.siguiente().catch((e) => this.#avisar(`Error al pasar a la siguiente (ノಠ益ಠ)ノ ${e.message}`));
     });
 
     this.reproductor.on('error', (error) => {
-      this.#avisar(`Error de reproduccion: ${error.message}`);
+      this.#avisar(`Error de reproduccion (╯°□°)╯ ${error.message}`);
     });
   }
 
@@ -114,7 +114,7 @@ export class ColaDeGuild {
 
     if (!pista) {
       this.actual = null;
-      this.#avisar('La cola esta vacia. Agrega mas canciones con **play**.');
+      this.#avisar('La cola esta vacia. Agrega mas canciones con **play** (｡•̀ᴗ-)✧');
       this.#programarDesconexion();
       return;
     }
@@ -126,7 +126,7 @@ export class ColaDeGuild {
       this.reproductor.play(recurso);
       if (!this.loop) this.#avisar(`Ahora reproduciendo: **${pista.titulo}** (≧ᗜˬᗜ≦)`);
     } catch (error) {
-      this.#avisar(`No pude reproducir **${pista.titulo}**: ${error.message}`);
+      this.#avisar(`No pude reproducir **${pista.titulo}** (；へ：) ${error.message}`);
       // Que un fallo puntual no deje el bot colgado: pasamos a la siguiente.
       if (this.loop) this.loop = false;
       if (this.pistas.length > 0) {
@@ -225,7 +225,7 @@ export class ColaDeGuild {
     this.#cancelarTemporizador();
     this.temporizador = setTimeout(() => {
       if (this.reproduciendo || this.pistas.length > 0) return;
-      this.#avisar('Me desconecte por inactividad.');
+      this.#avisar('Me desconecte por inactividad. (－ω－) zzZ');
       this.destruir();
     }, INACTIVIDAD_MS);
   }

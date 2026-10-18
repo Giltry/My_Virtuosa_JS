@@ -7,7 +7,9 @@ import { Client, Events, GatewayIntentBits } from 'discord.js';
 
 import { ColaDeGuild } from './src/cola.js';
 import { CODIGO_YA_CORRIENDO, PUERTO_BOT, reclamarInstancia } from './src/instancia.js';
-import { buscarPista, resolverYtDlp } from './src/ytdlp.js';
+import {
+  MAX_PISTAS_PLAYLIST, buscarPista, buscarPlaylist, esPlaylist, resolverYtDlp,
+} from './src/ytdlp.js';
 
 // Antes que nada: si ya hay un bot corriendo en este equipo, no arrancar otro.
 if (!(await reclamarInstancia(PUERTO_BOT))) {
@@ -54,12 +56,12 @@ function formatearDuracion(segundos) {
 const comandos = {
   async play(mensaje, argumento) {
     if (!argumento) {
-      return mensaje.reply('Dime que quieres escuchar: `!play <busqueda o enlace>`');
+      return mensaje.reply('Dime que quieres escuchar: `!play <busqueda, enlace o playlist>` (・・?)');
     }
 
     const canalVoz = mensaje.member?.voice?.channel;
     if (!canalVoz) {
-      return mensaje.reply('Debes estar en un canal de voz para usar este comando.');
+      return mensaje.reply('Debes estar en un canal de voz para usar este comando. (｡•́︿•̀｡)');
     }
 
     const cola = obtenerCola(mensaje.guild.id);
@@ -67,29 +69,44 @@ const comandos = {
 
     await mensaje.channel.sendTyping();
 
-    let pista;
+    const playlist = esPlaylist(argumento);
+    let pistas;
+    let lista;
     try {
-      pista = await buscarPista(argumento);
+      if (playlist) {
+        lista = await buscarPlaylist(argumento);
+        pistas = lista.pistas;
+      } else {
+        pistas = [await buscarPista(argumento)];
+      }
     } catch (error) {
-      return mensaje.reply(`Hubo un error al procesar la busqueda: ${error.message}`);
+      return mensaje.reply(`Hubo un error al procesar la busqueda (╥﹏╥) ${error.message}`);
     }
 
     try {
       await cola.conectar(canalVoz);
     } catch (error) {
       cola.destruir();
-      return mensaje.reply(`No pude conectarme al canal de voz: ${error.message}`);
+      return mensaje.reply(`No pude conectarme al canal de voz (ᗒᗣᗕ)՞ ${error.message}`);
     }
 
-    cola.agregar(pista);
+    const estabaParado = !cola.reproduciendo && !cola.pausado;
+    for (const pista of pistas) cola.agregar(pista);
 
-    if (!cola.reproduciendo && !cola.pausado) {
-      await cola.siguiente();
-    } else {
+    if (playlist) {
+      const recorte = lista.total > pistas.length
+        ? ` (solo las primeras ${MAX_PISTAS_PLAYLIST})`
+        : '';
       await mensaje.channel.send(
-        `Anadido a la cola: **${pista.titulo}**${formatearDuracion(pista.duracion)}`,
+        `Playlist anadida: **${lista.titulo}** — ${pistas.length} canciones${recorte} ٩(ˊᗜˋ)و`,
+      );
+    } else if (!estabaParado) {
+      await mensaje.channel.send(
+        `Anadido a la cola: **${pistas[0].titulo}**${formatearDuracion(pistas[0].duracion)} (ﾉ◕ヮ◕)ﾉ`,
       );
     }
+
+    if (estabaParado) await cola.siguiente();
   },
 
   async queue(mensaje) {
@@ -100,54 +117,61 @@ const comandos = {
       lineas.push(`**Sonando:** ${cola.actual.titulo}${cola.loop ? ' (en loop)' : ''}`);
     }
     if (cola?.pistas.length) {
-      lineas.push('', '**En cola:**');
-      cola.pistas.forEach((p, i) => {
+      // Con una playlist la cola puede tener 100 canciones: Discord corta a 2000
+      // caracteres, asi que se muestran las primeras y un resumen del resto.
+      const MOSTRAR = 15;
+      lineas.push('', `**En cola (${cola.pistas.length}):**`);
+      cola.pistas.slice(0, MOSTRAR).forEach((p, i) => {
         lineas.push(`${i + 1}. ${p.titulo}${formatearDuracion(p.duracion)}`);
       });
+      const resto = cola.pistas.length - MOSTRAR;
+      if (resto > 0) lineas.push(`... y ${resto} mas`);
     }
 
-    if (lineas.length === 0) return mensaje.reply('La cola esta vacia.');
+    if (lineas.length === 0) return mensaje.reply('La cola esta vacia. ( ˘･з･)');
     return mensaje.channel.send(lineas.join('\n').slice(0, 1900));
   },
 
   async loop(mensaje) {
     const cola = colas.get(mensaje.guild.id);
-    if (!cola?.actual) return mensaje.reply('No hay ninguna cancion sonando.');
+    if (!cola?.actual) return mensaje.reply('No hay ninguna cancion sonando. (・ω・)?');
 
     cola.loop = !cola.loop;
     return mensaje.channel.send(
-      `El modo loop ha sido ${cola.loop ? 'activado' : 'desactivado'}: **${cola.actual.titulo}**`,
+      cola.loop
+        ? `Modo loop activado: **${cola.actual.titulo}** ↻ (๑˃ᴗ˂)ﻭ`
+        : `Modo loop desactivado: **${cola.actual.titulo}** (￣▽￣)ノ`,
     );
   },
 
   async skip(mensaje) {
     const cola = colas.get(mensaje.guild.id);
-    if (!cola?.saltar()) return mensaje.reply('No hay nada que saltar.');
-    return mensaje.channel.send('Skipped');
+    if (!cola?.saltar()) return mensaje.reply('No hay nada que saltar. ( ´･ω･)?');
+    return mensaje.channel.send('Skipped ⊂(◉‿◉)つ');
   },
 
   async pause(mensaje) {
     const cola = colas.get(mensaje.guild.id);
     const resultado = cola?.alternarPausa();
-    if (!resultado) return mensaje.reply('No hay nada que pausar.');
+    if (!resultado) return mensaje.reply('No hay nada que pausar. ( ´･ω･)?');
     return mensaje.channel.send(
-      resultado === 'pausa' ? 'Cancion pausada.' : 'Cancion reanudada.',
+      resultado === 'pausa' ? 'Cancion pausada. (－ω－) zzZ' : 'Cancion reanudada. ♪(´▽｀)',
     );
   },
 
   async stop(mensaje) {
     const cola = colas.get(mensaje.guild.id);
-    if (!cola) return mensaje.reply('No estoy reproduciendo nada.');
+    if (!cola) return mensaje.reply('No estoy reproduciendo nada. (・・;)');
 
     cola.canalTexto = mensaje.channel;
     cola.detener();
-    return mensaje.channel.send('Reproduccion detenida y bot desconectado.');
+    return mensaje.channel.send('Reproduccion detenida y bot desconectado. ( ˙▿˙ )ノ');
   },
 
   async help(mensaje) {
     return mensaje.channel.send([
-      '**Comandos** (funcionan con `!`, `+`, `/` o `-`)',
-      '`play <busqueda o enlace>` — reproduce o anade a la cola (alias: `p`)',
+      '**Comandos** (funcionan con `!`, `+`, `/` o `-`) ♪(´ε｀ )',
+      '`play <busqueda, enlace o playlist>` — reproduce o anade a la cola (alias: `p`)',
       '`queue` — muestra la cola',
       '`loop` — repite la cancion actual',
       '`skip` — salta a la siguiente',
@@ -188,7 +212,7 @@ cliente.on(Events.MessageCreate, async (mensaje) => {
     await comando(mensaje, partes.join(' '));
   } catch (error) {
     console.error(`Error en el comando "${nombre}":`, error);
-    mensaje.reply(`Algo salio mal: ${error.message}`).catch(() => {});
+    mensaje.reply(`Algo salio mal (×﹏×) ${error.message}`).catch(() => {});
   }
 });
 

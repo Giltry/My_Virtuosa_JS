@@ -6,7 +6,7 @@ Versión en JavaScript del bot de música [Virtuosa](https://github.com/Giltry/D
 
 | Comando | Alias | Qué hace |
 |---|---|---|
-| `!play <búsqueda o enlace>` | `!p` | Busca en YouTube y reproduce, o añade a la cola |
+| `!play <búsqueda, enlace o playlist>` | `!p` | Busca en YouTube y reproduce, o añade a la cola. Con un enlace de playlist añade hasta 100 canciones |
 | `!queue` | `!q` | Muestra la cola |
 | `!loop` | | Repite la canción actual |
 | `!skip` | `!s` | Salta a la siguiente |
